@@ -6,10 +6,21 @@ This repository implements advanced cognitive architecture patterns, specificall
 
 ## 🚀 Features
 * **Agentic Debate:** A multi-node StateGraph that generates drafts, critiques them (Attacker), defends them (Defender), and judges the outcome.
+* **Configurable Multi-Turn Loop:** Supports adversarial loops where the Attacker and Defender can go back and forth multiple times to build a deeper case before reaching the Judge.
 * **Structured Outputs:** Strict enforcement of LLM outputs using Pydantic models mapped to a LangGraph `TypedDict` state.
 * **Safe Execution:** Utilizes LangGraph's Checkpointer (`interrupt_before`) to pause execution and route to a human manager if the Judge detects high ambiguity or policy risk.
 * **Full Observability:** Deeply integrated with Langfuse to trace every token, cost, and sub-graph execution.
 * **Cost Optimized:** Configured for `gemini-3-flash-preview` to run high-speed, low-cost internal debate loops, protecting unit economics.
+
+## ⚙️ Configuration
+
+The framework is highly configurable via the `.env` file:
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `MAX_DEBATE_TURNS` | `1` | Controls the depth of the adversarial loop. Set to `1` for a single critique/defense, or `2-3` for deep multi-turn reasoning. |
+| `LLM_MODEL_NAME` | `gemini-3-flash-preview` | The primary model used for the debate loops. |
+| `LLM_FALLBACK_MODEL_NAME` | `gemini-2.5-flash` | Automatic fallback model used to handle rate limits or API outages. |
 
 ## 🛠️ Quickstart
 

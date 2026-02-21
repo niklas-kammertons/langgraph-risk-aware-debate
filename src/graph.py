@@ -1,5 +1,5 @@
 import os
-from typing import TypedDict
+from typing import TypedDict, Annotated
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -11,12 +11,13 @@ from pathlib import Path
 # Load settings
 MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "gemini-3-flash-preview")
 FALLBACK_MODEL_NAME = os.environ.get("LLM_FALLBACK_MODEL_NAME", "gemini-2.5-flash")
+MAX_DEBATE_TURNS = int(os.environ.get("MAX_DEBATE_TURNS", 1))
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 def get_llm(schema):
     """Initializes LLM with structured outputs and an automatic fallback model for rate limits."""
-    primary_llm = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0).with_structured_output(schema)
-    fallback_llm = ChatGoogleGenerativeAI(model=FALLBACK_MODEL_NAME, temperature=0).with_structured_output(schema)
+    primary_llm = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0, max_retries=3).with_structured_output(schema)
+    fallback_llm = ChatGoogleGenerativeAI(model=FALLBACK_MODEL_NAME, temperature=0, max_retries=3).with_structured_output(schema)
     return primary_llm.with_fallbacks([fallback_llm])
 
 
@@ -42,17 +43,27 @@ class JudgeResponse(BaseModel):
     escape_hatch_triggered: bool = Field(description="True ONLY if the debate reveals high uncertainty, unresolved ambiguity, or requires a manager's subjective judgment.")
     verdict: Literal["PASS", "FAIL", "AMBIGUOUS"] = Field(description="The final categorical verdict.")
 
+def concat_strings(left: str, right: str) -> str:
+    """Reducer function to accumulate strings in the state."""
+    if not left:
+        return right
+    if not right:
+        return left
+    return left + right
 
-# State Schema (Holds the Debate)
+
 class TicketState(TypedDict):
     query: str
     draft: str
     sources_cited: list[str]
-    critique: str
+    critique: Annotated[str, concat_strings]
     identified_ambiguities: list[str]
-    defense: str
+    defense: Annotated[str, concat_strings]
     concessions: list[str]
+    debate_synthesis: str
+    escape_hatch_triggered: bool
     verdict: str  # "PASS", "FAIL", "AMBIGUOUS"
+    turn_count: int
 
 
 # The Nodes (The Instacart LACE Debate)
@@ -62,27 +73,55 @@ def draft_node(state: TicketState):
     response = llm.invoke([sys_msg, HumanMessage(content=state.get("query", ""))])
     return {
         "draft": response.draft,
-        "sources_cited": response.sources_cited
+        "sources_cited": response.sources_cited,
+        "critique": "",             # Wipe constraints on new draft
+        "identified_ambiguities": [],
+        "defense": "",
+        "concessions": [],
+        "turn_count": 0             # Reset multi-turn counter
     }
 
 def attacker_node(state: TicketState):
     """Instacart Principle: The Skeptic"""
     llm = get_llm(CritiqueResponse)
     sys_msg = SystemMessage(content=load_prompt("attacker_prompt.md"))
-    response = llm.invoke([sys_msg, HumanMessage(content=state.get("draft", ""))])
+    
+    # Allow Auditor to see previous rounds if multi-turn
+    turn = state.get("turn_count", 0) + 1
+    recent_defense = state.get("defense", "")
+    
+    prompt_content = f"Draft to Attack: {state.get('draft', '')}"
+    if turn > 1 and recent_defense:
+       prompt_content += f"\n\nPrevious round's Defense to rebut: {recent_defense}"
+        
+    response = llm.invoke([sys_msg, HumanMessage(content=prompt_content)])
+    
+    # Accumulate history by returning just the new chunk (LangGraph operator.add handles the appending)
+    new_critique_text = f"--- Round {turn} Critique ---\n{response.critique}\n\n"
+    historical_ambiguities = state.get("identified_ambiguities", []) + response.identified_ambiguities
+    
     return {
-        "critique": response.critique,
-        "identified_ambiguities": response.identified_ambiguities
+        "critique": new_critique_text,
+        "identified_ambiguities": historical_ambiguities
     }
 
 def defender_node(state: TicketState):
     """Instacart Principle: The Supporter"""
     llm = get_llm(DefenseResponse)
     sys_msg = SystemMessage(content=load_prompt("defender_prompt.md"))
-    response = llm.invoke([sys_msg, HumanMessage(content=f"Draft: {state.get('draft', '')}\nCritique: {state.get('critique', '')}")])
+    turn = state.get("turn_count", 0) + 1
+    
+    # We only feed the FULL accumulated critique history so the defender knows what to answer
+    response = llm.invoke([sys_msg, HumanMessage(content=f"Draft: {state.get('draft', '')}\nCritique History: {state.get('critique', '')}")])
+    
+    # Accumulate history by returning just the new chunk (LangGraph operator.add handles the appending)
+    new_defense_text = f"--- Round {turn} Defense ---\n{response.defense}\n\n"
+    historical_concessions = state.get("concessions", []) + response.concessions
+    
     return {
-        "defense": response.defense,
-        "concessions": response.concessions
+        "defense": new_defense_text,
+        "concessions": historical_concessions,
+        "turn_count": turn
     }
 
 def judge_node(state: TicketState):
@@ -98,7 +137,11 @@ def judge_node(state: TicketState):
         f"Concessions: {state.get('concessions', [])}"
     )
     response = llm.invoke([sys_msg, HumanMessage(content=debate_text)])
-    return {"verdict": response.verdict}
+    return {
+        "debate_synthesis": response.debate_synthesis,
+        "escape_hatch_triggered": response.escape_hatch_triggered,
+        "verdict": response.verdict
+    }
 
 def human_escalation_node(state: TicketState):
     """Ramp Principle: Safe Escape Hatch"""
@@ -113,6 +156,12 @@ def route_verdict(state: TicketState):
     else:  # AMBIGUOUS
         return "human_escalation"
 
+def route_debate(state: TicketState):
+    """Multi-turn loop router"""
+    if state.get("turn_count", 0) < MAX_DEBATE_TURNS:
+        return "attacker"
+    return "judge"
+
 # Build the Graph
 builder = StateGraph(TicketState)
 builder.add_node("draft", draft_node)
@@ -125,7 +174,11 @@ builder.add_node("human_escalation", human_escalation_node)
 builder.set_entry_point("draft")
 builder.add_edge("draft", "attacker")
 builder.add_edge("attacker", "defender")
-builder.add_edge("defender", "judge")
+builder.add_conditional_edges(
+    "defender",
+    route_debate,
+    {"attacker": "attacker", "judge": "judge"}
+)
 builder.add_conditional_edges(
     "judge", 
     route_verdict, 
