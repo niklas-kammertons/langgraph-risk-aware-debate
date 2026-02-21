@@ -15,8 +15,8 @@ This repository implements advanced cognitive architecture patterns, specificall
 
 1. **Clone and setup environment:**
    ```bash
-   git clone <your-repo-url>
-   cd <your-repo-folder>
+   git clone https://github.com/niklas-kammertons/langgraph-risk-aware-debate.git
+   cd langgraph-risk-aware-debate
    conda env create -f environment.yml
    conda activate langgraph-demo
    ```
@@ -29,9 +29,6 @@ This repository implements advanced cognitive architecture patterns, specificall
 
 3. **Run the Interactive Demo:**
    Launch Jupyter Lab and open `demo.ipynb`. The notebook is heavily documented and designed to be a "one-click run" to watch the debate unfold in real-time.
-   ```bash
-   jupyter lab
-   ```
 
 ## 📁 Repository Structure
 * `prompts/`: Contains the modular, role-based Markdown instructions for the Agent, Attacker, Defender, and Judge.
