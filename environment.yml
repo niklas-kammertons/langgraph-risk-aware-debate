@@ -1,0 +1,17 @@
+name: langgraph-demo
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - jupyterlab
+  - graphviz
+  - pip:
+      - langchain
+      - langgraph
+      - langchain-google-genai
+      - langchain-core
+      - langfuse
+      - python-dotenv
+      - grandalf
