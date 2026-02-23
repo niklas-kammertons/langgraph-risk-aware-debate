@@ -1,4 +1,5 @@
 import os
+import operator
 from typing import TypedDict, Annotated
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import InMemorySaver
@@ -9,15 +10,14 @@ from typing import Literal
 from pathlib import Path
 
 # Load settings
-MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "gemini-2.5-flash-lite")
-FALLBACK_MODEL_NAME = os.environ.get("LLM_FALLBACK_MODEL_NAME", "gemini-3-flash-preview")
-MAX_DEBATE_TURNS = int(os.environ.get("MAX_DEBATE_TURNS", 1))
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 def get_llm(schema):
     """Initializes LLM with structured outputs and an automatic fallback model for rate limits."""
-    primary_llm = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=0, max_retries=3).with_structured_output(schema)
-    fallback_llm = ChatGoogleGenerativeAI(model=FALLBACK_MODEL_NAME, temperature=0, max_retries=3).with_structured_output(schema)
+    model_name = os.environ.get("LLM_MODEL_NAME", "gemini-2.5-flash-lite")
+    fallback_model_name = os.environ.get("LLM_FALLBACK_MODEL_NAME", "gemini-3-flash-preview")
+    primary_llm = ChatGoogleGenerativeAI(model=model_name, temperature=0, max_retries=3).with_structured_output(schema)
+    fallback_llm = ChatGoogleGenerativeAI(model=fallback_model_name, temperature=0, max_retries=3).with_structured_output(schema)
     return primary_llm.with_fallbacks([fallback_llm])
 
 
@@ -43,22 +43,13 @@ class JudgeResponse(BaseModel):
     escape_hatch_triggered: bool = Field(description="True ONLY if the debate reveals high uncertainty, unresolved ambiguity, or requires a manager's subjective judgment.")
     verdict: Literal["PASS", "FAIL", "AMBIGUOUS"] = Field(description="The final categorical verdict.")
 
-def concat_strings(left: str, right: str) -> str:
-    """Reducer function to accumulate strings in the state."""
-    if not left:
-        return right
-    if not right:
-        return left
-    return left + right
-
-
 class TicketState(TypedDict):
     query: str
     draft: str
     sources_cited: list[str]
-    critique: Annotated[str, concat_strings]
+    critique: Annotated[str, operator.add]
     identified_ambiguities: list[str]
-    defense: Annotated[str, concat_strings]
+    defense: Annotated[str, operator.add]
     concessions: list[str]
     debate_synthesis: str
     escape_hatch_triggered: bool
@@ -158,7 +149,8 @@ def route_verdict(state: TicketState):
 
 def route_debate(state: TicketState):
     """Multi-turn loop router"""
-    if state.get("turn_count", 0) < MAX_DEBATE_TURNS:
+    max_debate_turns = int(os.environ.get("MAX_DEBATE_TURNS", 1))
+    if state.get("turn_count", 0) < max_debate_turns:
         return "attacker"
     return "judge"
 

@@ -22,10 +22,19 @@ st.set_page_config(
 # Run immediately to load credentials for security gate
 load_dotenv(override=True)
 
+from src.graph import graph, load_prompt
+from langfuse.langchain import CallbackHandler
+langfuse_handler = CallbackHandler()
+
 # --- SECURITY GATE ---
 def check_password():
     """Returns `True` if the user had the correct password or is already authenticated."""
     
+    expected_password = os.environ.get("APP_PASSWORD")
+    if not expected_password:
+        st.error("⚠️ System Configuration Error: APP_PASSWORD environment variable is not set.")
+        st.stop()
+
     # Check if already authenticated in this session
     if st.session_state.get("password_correct", False):
         return True
@@ -96,7 +105,7 @@ def check_password():
     """, unsafe_allow_html=True)
 
     def password_entered():
-        if st.session_state["password_input"] == os.environ.get("APP_PASSWORD", "demo123"):
+        if st.session_state["password_input"] == expected_password:
             st.session_state["password_correct"] = True
             del st.session_state["password_input"]
         else:
@@ -247,17 +256,6 @@ with st.sidebar:
 
 
 
-
-# --- INITIALIZE GRAPH DYNAMICALLY ---
-# Note: load_dotenv() already called at top for security gate
-from langfuse.langchain import CallbackHandler
-
-# Force reload graph module so it catches the new updated os.environ vars set by the UI
-if "src.graph" in sys.modules:
-    importlib.reload(sys.modules["src.graph"])
-from src.graph import graph, load_prompt
-langfuse_handler = CallbackHandler()
-# ------------------------------------
 
 # Main Stage
 st.markdown('<h1 class="sd-header">Agentic Debate Validator</h1>', unsafe_allow_html=True)
