@@ -3,7 +3,13 @@ import os
 import time
 import sys
 import importlib
+from pathlib import Path
 from dotenv import load_dotenv
+
+# Add project root to sys.path to resolve ModuleNotFoundError in some environments
+root_path = str(Path(__file__).resolve().parent.parent)
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
 
 # Page configuration - MUST be first Streamlit command
 st.set_page_config(
