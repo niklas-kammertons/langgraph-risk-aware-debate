@@ -10,7 +10,7 @@ This repository implements advanced cognitive architecture patterns, specificall
 * **Structured Outputs:** Strict enforcement of LLM outputs using Pydantic models mapped to a LangGraph `TypedDict` state.
 * **Safe Execution:** Utilizes LangGraph's Checkpointer (`interrupt_before`) to pause execution and route to a human manager if the Judge detects high ambiguity or policy risk.
 * **Full Observability:** Deeply integrated with Langfuse to trace every token, cost, and sub-graph execution.
-* **Cost Optimized:** Configured for `gemini-3-flash-preview` to run high-speed, low-cost internal debate loops, protecting unit economics.
+* **Cost Optimized:** Configured for `gemini-2.5-flash-lite` to run high-speed, low-cost internal debate loops, protecting unit economics.
 
 ## ⚙️ Configuration
 
@@ -19,8 +19,8 @@ The framework is highly configurable via the `.env` file:
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `MAX_DEBATE_TURNS` | `1` | Controls the depth of the adversarial loop. Set to `1` for a single critique/defense, or `2-3` for deep multi-turn reasoning. |
-| `LLM_MODEL_NAME` | `gemini-3-flash-preview` | The primary model used for the debate loops. |
-| `LLM_FALLBACK_MODEL_NAME` | `gemini-2.5-flash` | Automatic fallback model used to handle rate limits or API outages. |
+| `LLM_MODEL_NAME` | `gemini-2.5-flash-lite` | The primary model used for the debate loops. |
+| `LLM_FALLBACK_MODEL_NAME` | `gemini-3-flash-preview` | Automatic fallback model used to handle rate limits or API outages. |
 
 ## 🛠️ Quickstart
 

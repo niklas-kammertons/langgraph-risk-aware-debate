@@ -9,8 +9,8 @@ from typing import Literal
 from pathlib import Path
 
 # Load settings
-MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "gemini-3-flash-preview")
-FALLBACK_MODEL_NAME = os.environ.get("LLM_FALLBACK_MODEL_NAME", "gemini-2.5-flash")
+MODEL_NAME = os.environ.get("LLM_MODEL_NAME", "gemini-2.5-flash-lite")
+FALLBACK_MODEL_NAME = os.environ.get("LLM_FALLBACK_MODEL_NAME", "gemini-3-flash-preview")
 MAX_DEBATE_TURNS = int(os.environ.get("MAX_DEBATE_TURNS", 1))
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
