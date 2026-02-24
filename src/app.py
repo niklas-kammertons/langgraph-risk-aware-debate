@@ -13,7 +13,7 @@ if root_path not in sys.path:
 
 # Page configuration - MUST be first Streamlit command
 st.set_page_config(
-    page_title="Agentic Debate | VIP Escort",
+    page_title="Agentic Debate | VIP Support",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -118,7 +118,7 @@ def check_password():
         with center_col:
             st.markdown('<span class="lock-icon">🛡️</span>', unsafe_allow_html=True)
             st.markdown('<div class="login-title">Security Gate</div>', unsafe_allow_html=True)
-            st.markdown('<div class="login-subtitle">Agentic Debate | VIP Escort Framework</div>', unsafe_allow_html=True)
+            st.markdown('<div class="login-subtitle">Agentic Debate | VIP Support Framework</div>', unsafe_allow_html=True)
             
             st.text_input(
                 "Access Password", 
@@ -259,7 +259,7 @@ with st.sidebar:
 
 # Main Stage
 st.markdown('<h1 class="sd-header">Agentic Debate Validator</h1>', unsafe_allow_html=True)
-st.markdown('<div class="sd-subheader">VIP E-commerce Escort Framework</div>', unsafe_allow_html=True)
+st.markdown('<div class="sd-subheader">VIP E-commerce Support Framework</div>', unsafe_allow_html=True)
 
 # Load the exact customer input used in demo.ipynb
 default_input = load_prompt("input_client.txt")
